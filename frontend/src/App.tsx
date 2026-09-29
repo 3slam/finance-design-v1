@@ -44,8 +44,8 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-surface-0 text-slate-100">
-      <header className="border-b border-surface-border bg-surface-1 px-4 py-3">
-        <div className="mx-auto flex max-w-2xl items-center justify-between">
+      <header className="border-b border-surface-border bg-surface-1 px-6 py-3">
+        <div className="flex items-center justify-between">
           <div>
             <div className="text-sm font-semibold text-slate-100">PantherExpress Finance Simulator</div>
             <div className="text-[11px] text-slate-500">A shipment's money, step by step</div>
@@ -56,33 +56,38 @@ export default function App() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-2xl space-y-4 px-4 py-8">
-        {error && (
-          <div className="rounded-lg border border-danger/50 bg-danger/10 px-4 py-2.5 text-[12.5px] text-danger">
-            <strong>Something went wrong:</strong> {error}
-          </div>
-        )}
+      <main className="grid w-full grid-cols-1 gap-6 px-6 py-8 lg:grid-cols-2">
+        <div className="space-y-4">
+          {error && (
+            <div className="rounded-lg border border-danger/50 bg-danger/10 px-4 py-2.5 text-[12.5px] text-danger">
+              <strong>Something went wrong:</strong> {error}
+            </div>
+          )}
 
-        {phase === 'intro' && <IntroCard onStart={beginShipmentStory} />}
+          {phase === 'intro' && <IntroCard onStart={beginShipmentStory} />}
 
-        {phase !== 'intro' && index === -1 && (
-          <div className="rounded-2xl border border-surface-border bg-surface-1 p-8 text-center shadow-xl">
-            <p className="text-sm text-slate-400">Getting started…</p>
-          </div>
-        )}
+          {phase !== 'intro' && index === -1 && (
+            <div className="rounded-2xl border border-surface-border bg-surface-1 p-8 text-center shadow-xl">
+              <p className="text-sm text-slate-400">Getting started…</p>
+            </div>
+          )}
 
-        {currentStep && currentResult && (
-          <>
-            <StoryCard step={currentStep} result={currentResult} stageNumber={index + 1} totalStages={steps.length} playKey={playKey} />
-            <Controls index={index} total={steps.length} playing={playing} onPrev={prev} onNext={next} onPlay={play} onPause={pause} />
-          </>
-        )}
+          {currentStep && currentResult && (
+            <>
+              <StoryCard step={currentStep} result={currentResult} stageNumber={index + 1} totalStages={steps.length} playKey={playKey} />
+              <Controls index={index} total={steps.length} playing={playing} onPrev={prev} onNext={next} onPlay={play} onPause={pause} />
+            </>
+          )}
 
-        {phase === 'shipment' && index === steps.length && <CompletionCard variant="shipment-done" onContinue={beginCompanyStory} onRestart={restart} />}
-        {phase === 'company' && index === steps.length && rollup && <CompletionCard variant="company-done" rollup={rollup} onRestart={restart} />}
+          {phase === 'shipment' && index === steps.length && <CompletionCard variant="shipment-done" onContinue={beginCompanyStory} onRestart={restart} />}
+          {phase === 'company' && index === steps.length && rollup && <CompletionCard variant="company-done" rollup={rollup} onRestart={restart} />}
 
-        {phase !== 'intro' && <ActivityFeed />}
-        {phase !== 'intro' && <DatabasePeek />}
+          {phase !== 'intro' && <ActivityFeed />}
+        </div>
+
+        <div>
+          <DatabasePeek />
+        </div>
       </main>
     </div>
   );
