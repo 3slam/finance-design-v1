@@ -66,25 +66,30 @@ correctly under a plain `node` runtime in production (see [Project structure](#p
 
 ## What this actually demonstrates
 
-Open the app and you get:
+The app is deliberately **one guided story, not a dashboard**: open it and you meet
+Ahmed (a courier) and Seller A, and walk through exactly what happens — one stage at a
+time — as Ahmed delivers, hands over cash, and Seller A and Ahmed both get paid. A
+second short story then walks through the company's own monthly expenses and revenue.
+Nothing here is a slideshow: every stage executes the same real `FinanceEngine` used
+everywhere else, against the same in-memory database, over the same REST API.
 
-- An **interactive ERD** (pan/zoom/drag, PK/FK badges, live record counts) generated
-  from one shared schema description — the same description also drives the backend's
-  in-memory tables.
-- A **Playground** to execute any of the 17 business actions in the document against
-  the current state, and eight **predefined scenarios** that reproduce the document's
-  own worked examples (§6 and §9) number-for-number.
-- A **slow-motion step player** — every action decomposes into named steps (who did
-  what), and each step's database mutations, domain events, and audit entries appear as
-  the player advances, with the affected ERD tables highlighting live.
-- A **money-flow view** showing who paid whom, how much, and why, as animated flows
-  between Customer / Courier / Merchant / Company.
-- A **before/after + "why did this change?"** inspector on every record and field.
-- An **audit log** and a clickable **action history** — click any past action (this
-  session or from the server's history) to re-inspect its full steps/mutations/events
-  without re-running it or disturbing current state.
-- **Presentation Mode** (default) vs. **Developer Mode** (raw table/event/payload detail).
-- **Reset Simulation** and **Reset + Replay Demo**.
+Each stage gives you:
+
+- A plain-English description of what's about to happen, and who's doing it (Ahmed,
+  Seller A, or "Finance," the company's back-office).
+- A simple animated **money-flow diagram** — only the parties actually involved in
+  that stage appear, with the real amount moving between them.
+- The plain-English **audit trail lines** the engine itself generated for that action
+  (not a rewritten summary — literally what the backend recorded).
+- ◀ Back / ▶ Play / Next ▶ controls, and a running "journey so far" list.
+
+For anyone who wants to go a layer deeper, an optional **"peek at the actual database
+tables"** panel (collapsed by default) shows the real rows in the key tables at any
+point in the story. At the end, a **Reset** button starts the whole thing over.
+
+The full 17-action, 19-table, multi-scenario engine described below is still there
+underneath — the REST API can run any of it — but the UI on top of it now tells one
+clear, linear story instead of exposing everything as a dashboard at once.
 
 ## Architecture
 
@@ -92,16 +97,15 @@ Open the app and you get:
 shared/    Domain model, ERD schema metadata, action catalog, the FinanceEngine
            (business logic + in-memory "database"), seed data, scenarios, unit tests.
 backend/   A thin Express REST API around one FinanceEngine instance.
-frontend/  React + TypeScript + Vite. React Flow for the ERD, Zustand for state,
-           Framer Motion for the money-flow animation, Tailwind for styling.
+frontend/  React + TypeScript + Vite. Zustand for the story's state, Framer Motion
+           for the money-flow animation, Tailwind for styling.
 docker/    nginx config used to serve the built frontend and proxy /api to the backend.
 ```
 
 `shared` is the important part: it is a **pure, framework-free TypeScript package**
 with no I/O — the backend is the only thing that touches it over HTTP, and the frontend
-only imports its *types* and pure helper functions (schema metadata, table-key mapping,
-option-labeling), never the engine itself. This is what makes "replace the simulated
-database with a real one" a backend-only change (see below).
+only imports its *types* and a couple of pure helpers (table-key mapping). This is what
+makes "replace the simulated database with a real one" a backend-only change (see below).
 
 ### Event-driven simulation, concretely
 
@@ -122,10 +126,10 @@ Every action in `shared/src/engine.ts` follows the same shape:
 
 The action's return value (`ActionExecutionResult`) bundles all of the above —
 steps, flattened mutations, events, audit entries, money flows, and which tables
-were affected. The frontend's step player literally replays this result: it starts
-from a snapshot of the state *before* the action, and re-applies each step's
-mutations in order as the player advances, which is what produces the "watch it
-happen" effect rather than an instant state swap.
+were affected. Each story stage in the frontend is literally one call to
+`POST /api/actions/:actionId/execute`, and everything shown for that stage (the
+money-flow diagram, the audit lines) comes straight from that one result — nothing
+is a canned animation.
 
 ## Actors
 
@@ -202,17 +206,18 @@ Every one of these is checked against the document's numbers in
 
 ## How the database changes, and how money flows
 
-Every mutation is `{table, op: INSERT|UPDATE, recordId, before, after}`. The frontend
-never diffs state itself — it replays the exact mutations the engine already
-produced, in the exact order the engine produced them, which is also what "why did
-this change?" reads from (it looks up the most recent mutation touching a record and
-shows the actor/action that caused it).
+Every mutation is `{table, op: INSERT|UPDATE, recordId, before, after}` — that's what
+the optional database-peek panel reads directly from the current state, and it's also
+what the "peek" panel's tables always reflect (the real row, not a copy the UI made up).
 
 Money flows are a separate, parallel record (`MoneyFlow`): `{kind, amount, from, to,
 status}`, one per real money movement in an action (e.g. delivering a COD shipment
 produces three: the customer's COD payment to the courier, the seller fee to the
-company, and the courier's commission from the company). The Money Flow tab animates
-these between named "lanes" (Customer / Courier / Merchant / Company / …).
+company, and the courier's commission from the company). Each story stage's diagram
+only draws the lanes (Customer / Courier / Merchant / Company / Vendor) that actually
+appear in that stage's flows — a settlement-calculation stage has none at all, since
+the document is explicit that calculating what's owed and actually paying it are two
+different steps (§6.7).
 
 ## Business Rules Extracted From Source File
 
@@ -306,27 +311,25 @@ app (a `⚠ assumed rule` badge on the action, and `isAssumedRule` on the result
 
 ## Playing it
 
-### Playground mode
+Press **Start the story** and go — there's nothing to configure. Each stage runs the
+real action against the backend the moment you reach it (via ◀ Back / ▶ Play / Next ▶),
+so "Back" just re-shows a card you've already seen; it doesn't undo anything.
 
-Left panel → **Playground** tab → pick any action → the form is generated from that
-action's declared inputs (dropdowns are populated live from current records, e.g. the
-shipment picker only lists real shipments) → **Execute**. Every precondition failure
-(wrong status, missing record, nothing to settle, etc.) surfaces as a red "ACTION
-FAILED" banner naming the exact reason, never a silent no-op.
+1. **The shipment story** (9 stages) — Ahmed delivers two COD packages and processes a
+   replacement refund, hands his cash to the hub, Finance calculates what Seller A and
+   Ahmed are each owed, and both get paid (Seller A's first payment attempt fails and
+   is retried, matching the document's own PAY001/PAY002 example).
+2. **The company story** (6 stages, offered once the shipment story finishes) — the
+   same five expenses and one revenue line from the document's worked example, ending
+   in the exact **−33,555 EGP** period result the document itself arrives at.
+3. **Restart** (top-right) resets the backend to its seeded state and starts over.
 
-### Scenario Player
-
-Left panel → **Scenarios** tab → **Run Scenario**. The bottom bar's playback controls
-(⏮ restart, ◀ previous step, ▶/❙❙ play/pause, ▶ next step, ⏭ skip to complete, and
-0.25×/0.5×/1×/2× speed) control the currently-playing transaction (or, for a
-multi-step scenario, the whole queue of transactions in order).
-
-### Action History
-
-Bottom bar → **Action History** tab. Click any past action (including ones that
-failed) to load its full recorded transaction into the same detail panel /
-step-player, without touching the live database state — useful for going back and
-explaining "what happened three actions ago" mid-demo.
+Everything the original, more dashboard-like build exposed (the full 17-action
+Playground, the 8-scenario picker, the interactive ERD graph, Developer Mode, Action
+History) still exists as engine/API capability — `shared/src/actions.ts` and
+`shared/src/scenarios.ts` are unchanged, and every endpoint in `backend/src/server.ts`
+still works — it's just not what the default UI surfaces any more, in favor of one
+clear story.
 
 ## Extending this project
 
@@ -348,14 +351,26 @@ explaining "what happened three actions ago" mid-demo.
 2. Add its bucket to `FinanceState` in `shared/src/state.ts` (and `emptyState()`).
 3. Add its row to `TABLE_STATE_KEY` in `shared/src/tableKeys.ts`.
 4. Add a `TableSchema` entry (columns, PK/FK) to `TABLE_SCHEMAS` in `shared/src/schema.ts`.
-5. Give it a position in `frontend/src/erd/layout.ts` (the only hand-placed,
-   presentation-only piece — everything else about the card is generated).
+5. If you want it in the simplified UI's optional database peek, add its name to
+   `CURATED_TABLES` in `frontend/src/components/DatabasePeek.tsx`.
 
 ### Add a new scenario
 
 Add its metadata to `SCENARIOS` in `shared/src/scenarios.ts`, and add a `case` in
 `FinanceEngine.runScenario` in `shared/src/engine.ts` that calls `this.execute(...)`
-(or looks up a prerequisite record, as the payout scenarios do) for each step.
+(or looks up a prerequisite record, as the payout scenarios do) for each step. (This is
+the engine-level scenario mechanism the API still exposes — see the note at the end of
+[Playing it](#playing-it).)
+
+### Add a stage to the guided story
+
+The frontend's own story is a plain array, independent of the `SCENARIOS` above: add
+an entry (`title`, `blurb`, `actionId`, and an `input` function that can read the
+current state, e.g. to look up an auto-generated settlement id) to `SHIPMENT_STORY` or
+`COMPANY_STORY` in `frontend/src/story/storySteps.ts`. Everything else — the progress
+dots, the money-flow diagram, the audit-line list, the "journey so far" feed — is
+generated from that array plus whatever the action actually returns, so a new stage
+needs no other frontend change.
 
 ### Replace the simulated database with a real one
 
@@ -390,12 +405,15 @@ shared/src/
 backend/src/server.ts REST API: state/schema/actions/scenarios/audit-log/events/
                        rollup/history, execute an action, run a scenario, reset.
 frontend/src/
-  store/useSimStore.ts  Zustand store: live state + the step-player/replay machinery.
-  replay.ts              Pure "apply these mutations to this snapshot" helper.
-  erd/                   React Flow canvas + custom table-card node + layout.
-  actors/                Actor strip, scenario list, Playground action form.
-  details/               Table/record inspector, "why did this change", transaction detail.
-  timeline/              Playback controls, Audit Log / Action History.
-  moneyflow/              Animated money-flow view + period roll-up report.
+  store/useStory.ts       Zustand store: current phase/stage, executed results, playback.
+  story/storySteps.ts     The two guided stories (SHIPMENT_STORY, COMPANY_STORY) as plain data.
+  components/
+    IntroCard.tsx          The welcome card.
+    StoryCard.tsx           One executed stage: actor, description, money-flow diagram, audit lines.
+    FlowDiagram.tsx          The animated money-flow lanes for one stage.
+    Controls.tsx             Back / Play / Next + progress dots.
+    ActivityFeed.tsx         The running "journey so far" list.
+    CompletionCard.tsx       End-of-shipment-story and end-of-company-story cards (with the period recap).
+    DatabasePeek.tsx         The collapsed, optional "see the real tables" panel.
 docker/nginx.conf     Serves the built frontend and proxies /api to the backend container.
 ```
