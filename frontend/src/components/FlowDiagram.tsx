@@ -31,9 +31,9 @@ const KIND_LABEL: Record<MoneyFlowKind, string> = {
 };
 
 function colorFor(flow: MoneyFlow): string {
-  if (flow.status === 'Failed') return '#ef5f5f';
-  if (flow.kind === 'RefundPayout' || flow.kind === 'ExpensePayment') return '#e2a53a';
-  return '#3ecf8e';
+  if (flow.status === 'Failed') return '#D93025';
+  if (flow.kind === 'RefundPayout' || flow.kind === 'ExpensePayment') return '#B7791F';
+  return '#0C6B43';
 }
 
 function icon(type: MoneyFlowParty['type']): string {
@@ -48,11 +48,11 @@ interface Props {
 export default function FlowDiagram({ flows, playKey }: Props) {
   if (flows.length === 0) {
     return (
-      <div className="flex h-28 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-surface-border text-slate-500">
+      <div className="flex h-28 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border text-text-muted">
         <motion.div animate={{ opacity: [0.4, 1, 0.4] }} transition={{ duration: 1.8, repeat: Infinity }} className="text-2xl">
           🧮
         </motion.div>
-        <p className="text-xs">No money moves in this step — it's just a calculation.</p>
+        <p className="text-body-s">No money moves in this step — it's just a calculation.</p>
       </div>
     );
   }
@@ -68,12 +68,12 @@ export default function FlowDiagram({ flows, playKey }: Props) {
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: i * 0.3, duration: 0.5 }}
             className="flex items-center justify-between rounded-lg border px-3 py-2"
-            style={{ borderColor: `${color}55`, backgroundColor: `${color}12` }}
+            style={{ borderColor: `${color}40`, backgroundColor: `${color}0D` }}
           >
-            <div className="flex items-center gap-1.5 text-[13px] text-slate-200">
+            <div className="flex items-center gap-1.5 text-body-m text-ink">
               <span>{icon(flow.from.type)}</span>
               <span>{flow.from.label}</span>
-              <span className="mx-1 text-slate-500">→</span>
+              <span className="mx-1 text-text-muted">→</span>
               <span>{icon(flow.to.type)}</span>
               <span>{flow.to.label}</span>
             </div>
@@ -81,7 +81,7 @@ export default function FlowDiagram({ flows, playKey }: Props) {
               <div className="font-mono text-sm font-semibold" style={{ color }}>
                 {flow.amount} EGP
               </div>
-              <div className="text-[10px] text-slate-500">
+              <div className="text-[10px] text-text-muted">
                 {KIND_LABEL[flow.kind]}
                 {flow.status === 'Failed' ? ' — failed' : ''}
               </div>

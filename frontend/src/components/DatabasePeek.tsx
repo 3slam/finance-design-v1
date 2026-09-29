@@ -41,8 +41,8 @@ export default function DatabasePeek() {
   if (!dbState) return null;
 
   return (
-    <div className="rounded-xl border border-surface-border bg-surface-1 p-4">
-      <h3 className="mb-3 text-[12.5px] font-semibold text-slate-300">🗄 The actual database tables</h3>
+    <div className="rounded-xl border border-border bg-bg-surface p-4">
+      <h3 className="mb-3 text-body-m font-semibold text-text-secondary">🗄 The actual database tables</h3>
       <div className="space-y-5">
         {CURATED_TABLES.map((table) => {
           const schema = getTableSchema(table);
@@ -52,15 +52,15 @@ export default function DatabasePeek() {
           const colNames = [...(COLUMNS[table] ?? schema.columns.slice(0, 6).map((c) => c.name)), ...extraCols];
           return (
             <div key={table}>
-              <div className="mb-1 flex items-center gap-2 text-[11px] font-semibold text-slate-400">
-                {schema.label} <span className="text-slate-600">({records.length})</span>
+              <div className="mb-1 flex items-center gap-2 text-body-s font-semibold text-text-tertiary">
+                {schema.label} <span className="text-text-muted">({records.length})</span>
               </div>
               {records.length === 0 ? (
-                <p className="text-[11px] text-slate-600">No records yet.</p>
+                <p className="text-body-s text-text-muted">No records yet.</p>
               ) : (
-                <div className="overflow-x-auto rounded border border-surface-border">
+                <div className="overflow-x-auto rounded-lg border border-border">
                   <table className="w-full font-mono text-[10.5px]">
-                    <thead className="bg-surface-2 text-slate-500">
+                    <thead className="bg-bg-field text-text-tertiary">
                       <tr>
                         {colNames.map((name) => (
                           <th key={name} className="whitespace-nowrap px-2 py-1 text-left font-medium">
@@ -71,9 +71,9 @@ export default function DatabasePeek() {
                     </thead>
                     <tbody>
                       {records.map((r) => (
-                        <tr key={String(r.id)} className="border-t border-surface-border/60">
+                        <tr key={String(r.id)} className="border-t border-border">
                           {colNames.map((name) => (
-                            <td key={name} className="whitespace-nowrap px-2 py-1 text-slate-300">
+                            <td key={name} className="whitespace-nowrap px-2 py-1 text-text-secondary">
                               {fmt(r[name])}
                             </td>
                           ))}
@@ -83,7 +83,7 @@ export default function DatabasePeek() {
                   </table>
                 </div>
               )}
-              {extraCols.length > 0 && <p className="mt-1 text-[10px] text-slate-600">* read from the related Shipment, not stored on this table.</p>}
+              {extraCols.length > 0 && <p className="mt-1 text-[10px] text-text-muted">* read from the related Shipment, not stored on this table.</p>}
             </div>
           );
         })}

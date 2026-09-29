@@ -35,7 +35,7 @@ export default function App() {
   }, [init]);
 
   if (!loaded) {
-    return <div className="flex h-screen items-center justify-center bg-surface-0 text-sm text-slate-500">Loading…</div>;
+    return <div className="flex h-screen items-center justify-center bg-bg-canvas text-sm text-text-tertiary">Loading…</div>;
   }
 
   const steps = phase === 'shipment' ? SHIPMENT_STORY : phase === 'company' ? COMPANY_STORY : [];
@@ -43,14 +43,14 @@ export default function App() {
   const currentResult = currentStep ? results[currentStep.id] : null;
 
   return (
-    <div className="min-h-screen bg-surface-0 text-slate-100">
-      <header className="border-b border-surface-border bg-surface-1 px-6 py-3">
+    <div className="min-h-screen bg-bg-canvas text-ink">
+      <header className="border-b border-border bg-bg-surface px-6 py-3">
         <div className="flex items-center justify-between">
           <div>
-            <div className="text-sm font-semibold text-slate-100">PantherExpress Finance Simulator</div>
-            <div className="text-[11px] text-slate-500">A shipment's money, step by step</div>
+            <div className="text-heading-s text-ink">PantherExpress Finance Simulator</div>
+            <div className="text-body-s text-text-tertiary">A shipment's money, step by step</div>
           </div>
-          <button onClick={restart} className="rounded-md border border-surface-border px-3 py-1.5 text-[11px] text-slate-400 hover:bg-surface-2">
+          <button onClick={restart} className="rounded-full border border-border px-4 py-1.5 text-body-s font-medium text-text-secondary hover:bg-bg-field">
             ↻ Restart
           </button>
         </div>
@@ -59,7 +59,7 @@ export default function App() {
       <main className="grid w-full grid-cols-1 gap-6 px-6 py-8 lg:grid-cols-2">
         <div className="space-y-4">
           {error && (
-            <div className="rounded-lg border border-danger/50 bg-danger/10 px-4 py-2.5 text-[12.5px] text-danger">
+            <div className="rounded-lg border border-danger/30 bg-danger-bg px-4 py-2.5 text-body-m text-danger">
               <strong>Something went wrong:</strong> {error}
             </div>
           )}
@@ -67,8 +67,8 @@ export default function App() {
           {phase === 'intro' && <IntroCard onStart={beginShipmentStory} />}
 
           {phase !== 'intro' && index === -1 && (
-            <div className="rounded-2xl border border-surface-border bg-surface-1 p-8 text-center shadow-xl">
-              <p className="text-sm text-slate-400">Getting started…</p>
+            <div className="rounded-2xl border border-border bg-bg-surface p-8 text-center shadow-sm">
+              <p className="text-body-l text-text-tertiary">Getting started…</p>
             </div>
           )}
 
