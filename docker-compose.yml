@@ -4,7 +4,7 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     ports:
-      - '4000:4000'
+      - '${BACKEND_PORT:-4000}:4000'
     environment:
       - PORT=4000
     restart: unless-stopped
@@ -14,7 +14,7 @@ services:
       context: .
       dockerfile: frontend/Dockerfile
     ports:
-      - '8080:80'
+      - '${FRONTEND_PORT:-8090}:80'
     depends_on:
       - backend
     restart: unless-stopped

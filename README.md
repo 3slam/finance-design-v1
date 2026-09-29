@@ -19,8 +19,21 @@ docker compose up --build
 
 Then open:
 
-- **App:** http://localhost:8080
+- **App:** http://localhost:8090
 - **API:** http://localhost:4000/api/health
+
+If either port is already taken on your machine (or, on Windows, falls inside a
+Hyper-V/WSL2 "excluded port range" — you'll see a `bind: An attempt was made to
+access a socket in a way forbidden by its access permissions` error), override it
+without editing any file:
+
+```bash
+# Windows PowerShell
+$env:FRONTEND_PORT=8091; $env:BACKEND_PORT=4001; docker compose up --build
+
+# macOS / Linux
+FRONTEND_PORT=8091 BACKEND_PORT=4001 docker compose up --build
+```
 
 > This repository was built and its Docker build steps were verified stage-by-stage
 > (`npm ci`, `tsc` builds, running the compiled backend and the production frontend
