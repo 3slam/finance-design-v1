@@ -8,3 +8,4 @@ export * from './tableKeys.js';
 export { buildSeedState } from './seed.js';
 export { FinanceEngine, ValidationError } from './engine.js';
 export { IdGenerator } from './id.js';
+export * as Ledger from './ledger/index.js';

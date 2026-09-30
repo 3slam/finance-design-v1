@@ -4,14 +4,22 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repository is
 
-An interactive simulation of PantherExpress's "Level 2 Finance Design" (shipping
-finance without a double-entry ledger): a pure TypeScript domain engine + REST API +
-React frontend that walks through a shipment's real financial lifecycle (delivery →
-courier cash reconciliation → seller/courier settlement → payout) and a company
-expenses/revenue story, using the exact worked examples from the source design doc.
-See `README.md` for the full write-up (architecture, business rules extracted from the
-source document, assumptions made, and how to extend it) — this file only covers the
-commands and orientation needed to work in the code.
+An interactive simulation of PantherExpress's shipping finance, in two designs the app
+lets you switch between as tabs:
+
+1. **"What We Did"** — the "Level 2 Finance Design" (shipping finance *without* a
+   double-entry ledger): flat, per-table running-balance fields.
+2. **"The Second Approach"** — the same story (same Ahmed, same Seller A, same
+   PN001-PN003) rebuilt on a real double-entry ledger (chart of accounts + balanced
+   FinanceTransactions/Entries), per a second reference document.
+
+Both are pure TypeScript domain engines + REST APIs + one React frontend that walks
+through a shipment's real financial lifecycle (delivery → courier cash reconciliation →
+seller/courier settlement → payout) and a company expenses/revenue story, using the
+exact worked examples from each source document. See `README.md` for the full write-up
+(architecture, business rules extracted from both source documents, assumptions made,
+and how to extend either design) — this file only covers the commands and orientation
+needed to work in the code.
 
 ## Commands
 
@@ -27,9 +35,9 @@ npm run build                # builds shared, backend, frontend in order
 docker compose up --build    # full stack at http://localhost:8090 (override with FRONTEND_PORT/BACKEND_PORT env vars)
 ```
 
-Run a single test: `cd shared && npx vitest run -t "<test name substring>"`, or
-`npx vitest run src/engine.test.ts` for the whole suite (there's only one test file
-today — all business-logic tests live there).
+Run a single test: `cd shared && npx vitest run -t "<test name substring>"`. Two test
+files: `src/engine.test.ts` (the flat design) and `src/ledger/engine.test.ts` (the
+ledger design, including a trial-balance-stays-balanced check after every action).
 
 If you edit `shared/src/*`, re-run `npm run build -w shared` (or `npm run dev -w shared`
 to watch) before the change shows up in `backend`/`frontend` — see the module
@@ -38,13 +46,25 @@ resolution note above.
 ## Architecture
 
 ```
-shared/    Pure TS, no I/O: domain types, ERD schema metadata, the action catalog,
-           FinanceEngine (all business logic + the in-memory "database"), seed data,
-           the engine-level scenario runner, and engine.test.ts.
-backend/   Thin Express REST API around one FinanceEngine instance (backend/src/server.ts).
-frontend/  React + Vite. A single guided, linear "story" UI (NOT a dashboard — see
-           README's "What this actually demonstrates") built on Zustand + Framer Motion.
-docker/    nginx config serving the built frontend and proxying /api to the backend.
+shared/          Pure TS, no I/O: the flat design's domain types, ERD schema metadata,
+                  action catalog, FinanceEngine, seed data, scenario runner, engine.test.ts.
+shared/ledger/    The second approach's own domain types, chart-of-accounts seed,
+                  calculations (account balances / trial balance, computed not stored),
+                  LedgerEngine, and its own engine.test.ts. Self-contained — imports only
+                  a handful of generic types from `../domain.ts` (ActorRole, MoneyFlow,
+                  AuditLogEntry) and reuses `ValidationError` from `../engine.ts`.
+backend/          Thin Express REST API around one FinanceEngine instance AND one
+                  LedgerEngine instance (backend/src/server.ts) — `/api/*` for the flat
+                  design, `/api/ledger/*` for the ledger design. Two engines, two
+                  histories, never shared state.
+frontend/         React + Vite, one app with a two-tab shell (App.tsx): FlatDesignView
+                  (the original guided story + DatabasePeek) and LedgerDesignView (the
+                  ledger story + LedgerPeek — chart of accounts, live trial balance, and
+                  the journal of FinanceTransactions/Entries). StoryCard / Controls /
+                  ActivityFeed / CompletionCard are shared by both tabs — StoryCard and
+                  ActivityFeed take structural prop types (not the flat design's concrete
+                  ActionExecutionResult) specifically so both engines' result shapes fit.
+docker/           nginx config serving the built frontend and proxying /api to the backend.
 ```
 
 Key thing to know before touching `shared/src/engine.ts`: every action follows the
@@ -67,7 +87,11 @@ Frontend styling uses a specific brand palette + type scale (Tailwind tokens in
 `display-l`/`heading-*`/`body-*` font-size scale) — reuse these tokens rather than
 introducing new ad hoc colors/sizes.
 
-Every business rule, table, and action in `shared/` traces to a section of the source
-finance-design document; if you add or change business logic, check README's "Business
-Rules Extracted From Source File" and "Assumptions" sections first so you don't
-duplicate or contradict something already resolved there.
+Every business rule, table, and action in `shared/` traces to a section of the flat
+design's source document; every account code, transaction type, and table in
+`shared/ledger/` traces to a section of the ledger design's own reference document (see
+`shared/ledger/domain.ts`'s file header for exactly what's implemented vs. what that
+document covers as reference material only). If you add or change business logic, check
+README's "Business Rules Extracted From Source File" / "The Ledger Design" and
+"Assumptions" sections first so you don't duplicate or contradict something already
+resolved there.

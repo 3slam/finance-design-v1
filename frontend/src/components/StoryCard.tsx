@@ -1,5 +1,4 @@
-import type { ActionExecutionResult, ActorRole } from '@pfx/shared';
-import type { StoryStep } from '../story/storySteps.js';
+import type { ActorRole, AuditLogEntry, MoneyFlow } from '@pfx/shared';
 import FlowDiagram from './FlowDiagram.js';
 
 const ACTOR_LABEL: Record<ActorRole, string> = {
@@ -16,9 +15,18 @@ const ACTOR_ICON: Record<ActorRole, string> = {
   System: '⚙️',
 };
 
+/** Structural, not the flat design's concrete `ActionExecutionResult` —
+ * both engines' result shapes satisfy this, so this card renders either. */
+export interface StoryCardResult {
+  actor: ActorRole;
+  isAssumedRule: boolean;
+  moneyFlows: MoneyFlow[];
+  auditEntries: AuditLogEntry[];
+}
+
 interface Props {
-  step: StoryStep;
-  result: ActionExecutionResult;
+  step: { title: string; blurb: string };
+  result: StoryCardResult;
   stageNumber: number;
   totalStages: number;
   playKey: number;

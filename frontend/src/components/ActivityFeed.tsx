@@ -1,21 +1,25 @@
-import { useStory } from '../store/useStory.js';
-import { COMPANY_STORY, SHIPMENT_STORY } from '../story/storySteps.js';
+import type { MoneyFlow } from '@pfx/shared';
 
-export default function ActivityFeed() {
-  const phase = useStory((s) => s.phase);
-  const index = useStory((s) => s.index);
-  const order = useStory((s) => s.order);
-  const results = useStory((s) => s.results);
+interface ActivityFeedStep {
+  id: string;
+  title: string;
+}
 
-  if (phase === 'intro') return null;
+interface Props {
+  heading: string;
+  steps: ActivityFeedStep[];
+  index: number;
+  order: string[];
+  results: Record<string, { moneyFlows: MoneyFlow[] }>;
+}
 
-  const steps = phase === 'shipment' ? SHIPMENT_STORY : COMPANY_STORY;
-
+/** Reused by both designs' guided stories — takes its state as props rather
+ * than reading a specific global store, so it doesn't care which engine
+ * produced the results. */
+export default function ActivityFeed({ heading, steps, index, order, results }: Props) {
   return (
     <div className="rounded-xl border border-border bg-bg-surface p-4">
-      <h3 className="mb-3 text-body-s font-semibold uppercase tracking-wide text-text-muted">
-        {phase === 'shipment' ? "Today's deliveries" : 'This month’s expenses & revenue'}
-      </h3>
+      <h3 className="mb-3 text-body-s font-semibold uppercase tracking-wide text-text-muted">{heading}</h3>
       <ol className="space-y-2">
         {steps.map((step, i) => {
           const done = i <= index;

@@ -1,15 +1,25 @@
 # PantherExpress Finance Simulator
 
-An interactive, working simulation of the **Level 2 Finance Design** for PantherExpress
-(shipping finance without a double-entry ledger). It is not a static ERD or a mockup —
-it's a real in-memory database, a real business-rule engine, and a REST API, fronted by
-a React app that lets you execute the actual business actions from the source document
-and watch the resulting database and money movements happen step by step.
+An interactive, working simulation of PantherExpress's shipping finance — in **two
+designs**, presented as two tabs in the same app:
 
-The source document is the single source of truth for every business rule in this
-repository. Nothing here invents actors, tables, statuses, fees, or money movements that
-aren't in that document — see [Assumptions](#assumptions) for the handful of places a
-number or a minor rule had to be filled in, and exactly why.
+1. **"What We Did"** — the **Level 2 Finance Design** (shipping finance *without* a
+   double-entry ledger): flat, per-table running-balance fields.
+2. **"The Second Approach"** — the exact same story rebuilt on a **real double-entry
+   ledger** (a chart of accounts + balanced FinanceTransactions/Entries), per a second
+   reference document. See [The Second Approach](#the-second-approach--a-double-entry-ledger-design)
+   below.
+
+Neither tab is a static ERD or a mockup — each is a real in-memory database, a real
+business-rule engine, and a REST API, fronted by one React app that lets you execute the
+actual business actions from each source document and watch the resulting database and
+money movements happen step by step.
+
+Each source document is the single source of truth for its own tab's business rules.
+Nothing here invents actors, tables, statuses, fees, or money movements that aren't in
+the relevant document — see [Assumptions](#assumptions) for the flat design's handful of
+places a number or a minor rule had to be filled in and exactly why, and the ledger
+design's own section for the same.
 
 ## Quick start
 
@@ -90,6 +100,11 @@ point in the story. At the end, a **Reset** button starts the whole thing over.
 The full 17-action, 19-table, multi-scenario engine described below is still there
 underneath — the REST API can run any of it — but the UI on top of it now tells one
 clear, linear story instead of exposing everything as a dashboard at once.
+
+This is the app's first tab, **"What We Did."** A second tab, **"The Second
+Approach,"** runs the exact same story again — same Ahmed, same Seller A, same
+packages — through a completely different engine built on a real double-entry ledger;
+see [The Second Approach](#the-second-approach--a-double-entry-ledger-design) below.
 
 ## Architecture
 
@@ -331,6 +346,84 @@ History) still exists as engine/API capability — `shared/src/actions.ts` and
 still works — it's just not what the default UI surfaces any more, in favor of one
 clear story.
 
+## The Second Approach — A Double-Entry Ledger Design
+
+The second tab is a from-scratch implementation of a different reference document: **"The
+Finance System (Ledger) Explained in Detail"** — a full production-grade double-entry
+ledger design for the same PantherExpress business (Accounts, Transactions, Entries,
+Courier Reconciliations, Settlements, Payouts, and 50+ edge cases, screens, and a backend
+spec across its own six parts). Where the flat design stores a running balance on
+whichever table needed one, this design stores nothing but a chart of accounts and a
+log of balanced double-entry postings — every number (what a seller is owed, what a
+courier is holding, the period's net result) is a query over that log, never a stored
+field.
+
+**Same story, same numbers, different bookkeeping.** Both tabs seed the same actors
+(Ahmed, Seller A, Hub 7, PN001/PN002/PN003) and, run through the same guided story, land
+on the exact same figures: Seller A nets **1,430 EGP**, Ahmed nets **125 EGP**, and the
+company story's period result is the same **−33,555 EGP** — just reached by posting
+`DELIVERY_POSTED` / `REPLACEMENT_POSTED` / `COURIER_CASH_HANDOVER` / `SELLER_PAYOUT` /
+`COURIER_PAYOUT` / `EXPENSE_PAID` / `OTHER_REVENUE_RECEIVED` transactions against a
+chart of accounts, instead of updating `ShipmentFinancials.sellerFee` or
+`SellerSettlement.totalNet` in place.
+
+### The chart of accounts
+
+Account codes follow the document's own `family:owner:purpose` format
+(`shared/src/ledger/seed.ts`):
+
+| Account | Type | Normal side | What it answers |
+|---|---|---|---|
+| `courier:{id}:cash` | Asset | Debit | Customer cash the courier is holding, still owed to the hub |
+| `courier:{id}:payable` | Liability | Credit | Everything the company owes that courier (commission, bonus, fronted-expense reimbursement — one account, per the document's own model) |
+| `hub:{id}:cash` | Asset | Debit | Cash in the hub safe |
+| `bank:main` | Asset | Debit | The company bank account |
+| `seller:{id}:payable` | Liability | Credit | What the company owes that seller |
+| `cash:suspense` | Liability | Credit | Cash of unknown origin (a reconciliation overage), until investigated |
+| `revenue:shipping` / `revenue:replacement` / `revenue:other` | Revenue | Credit | Fee and other income |
+| `expense:courier` / `expense:fuel` / `expense:maintenance` / `expense:rent` / `expense:utilities` / `expense:compensation` | Expense | Debit | Operating costs |
+
+### What's implemented vs. what's reference material
+
+The document's Parts 1-3 (every concept, every table, and the full worked example —
+delivery, replacement, cash reconciliation, deposit, settlements, a claim, payouts, the
+trial balance) are implemented **faithfully and in full** — see
+`shared/src/ledger/domain.ts`'s file header and `shared/src/ledger/engine.test.ts` for
+exactly which of its numbers are checked. Parts 4-6 catalogue 50+ further edge cases
+(returns, corrections, concurrency), every screen down to the field and permission, and
+a full backend/API/migration spec for a real production system — this simulation
+implements the same core mechanics those all generalize from (one balanced-posting
+primitive, idempotency by `sourceEventId`, immutability, a computed-not-stored balance),
+not each of the 50+ cases individually. Concretely, **not implemented**: Claims and
+Adjustments as their own workflow tables (the guided story never exercises them),
+courier floats/advances, multi-hub transfers, and the reserve-on-approve settlement
+variant. Read Models (`ShipmentFinancialSummary` / `SellerFinancialSummary` /
+`CourierFinancialSummary`, doc §13) are computed live from the ledger on every read
+(`shared/src/ledger/calculations.ts`) rather than persisted and incrementally updated —
+functionally identical at this data volume; a production system would do the latter for
+speed at scale, exactly as the document itself describes.
+
+`OTHER_REVENUE_RECEIVED` is this engine's one addition beyond the document's own
+transaction-type catalogue — trivially inferable from its existing `revenue:other`
+account and its own "money entered an Asset → Debit it" pattern, needed only because the
+company story records a one-off sale the document's own worked example doesn't cover.
+
+### Try it yourself
+
+- **The trial balance always closes.** Every guided-story action posts through one
+  `LedgerEngine#post()` primitive that rejects an unbalanced set of lines before they
+  ever reach the state (`shared/src/ledger/engine.ts`) — `engine.test.ts` asserts
+  Σ(debit-normal balances) = Σ(credit-normal balances) after *every single action* in
+  both stories, not just at the end.
+- **A shortage doesn't vanish.** Hand over less cash than expected at the reconciliation
+  stage (edit `LEDGER_SHIPMENT_STORY`'s `reconcile` step in
+  `frontend/src/story/ledgerStorySteps.ts` to pass a smaller `actualCash`) and watch the
+  courier's own cash-in-hand account keep the difference — no separate "debt" table
+  needed, unlike the flat design's `CustodyDebt`.
+- **A failed payout touches nothing.** `executePayout` with `simulateFailure: true`
+  posts zero ledger entries — only a `Payout` row — because no money actually moved; the
+  retry is what posts `SELLER_PAYOUT`.
+
 ## Extending this project
 
 ### Add a new business action
@@ -402,18 +495,33 @@ shared/src/
   seed.ts            Seed data reproducing the worked examples.
   engine.ts          FinanceEngine — all 17 actions + the 8 scenario runners.
   engine.test.ts     Vitest suite checking the engine against the document's numbers.
-backend/src/server.ts REST API: state/schema/actions/scenarios/audit-log/events/
-                       rollup/history, execute an action, run a scenario, reset.
+  ledger/            The second approach — self-contained, its own ERD:
+    domain.ts          Account/FinanceTransaction/FinanceEntry/Settlement/Payout types.
+    state.ts            The LedgerState shape (the "database").
+    seed.ts             Chart of accounts + the same actors/shipments as ../seed.ts.
+    tableKeys.ts        table name -> LedgerState key.
+    calculations.ts     getAccountBalance / getTrialBalance / Read Model views — all computed live.
+    engine.ts           LedgerEngine — the 9 actions the guided story exercises.
+    engine.test.ts      Checks every TX against the ledger document's own worked-example tables.
+backend/src/server.ts REST API for both engines: /api/* (flat) and /api/ledger/*
+                       (ledger) — state/rollup/history, execute an action, reset.
 frontend/src/
-  store/useStory.ts       Zustand store: current phase/stage, executed results, playback.
-  story/storySteps.ts     The two guided stories (SHIPMENT_STORY, COMPANY_STORY) as plain data.
+  App.tsx                  The two-tab shell (What We Did / The Second Approach).
+  FlatDesignView.tsx        The flat design's guided story + DatabasePeek (former App.tsx body).
+  LedgerDesignView.tsx      The ledger design's guided story + LedgerPeek.
+  store/useStory.ts        Zustand store for the flat design: phase/stage, results, playback.
+  store/useLedgerStory.ts   Same shape, for the ledger design's own engine/API.
+  story/storySteps.ts      SHIPMENT_STORY / COMPANY_STORY (flat design) as plain data.
+  story/ledgerStorySteps.ts LEDGER_SHIPMENT_STORY / LEDGER_COMPANY_STORY, same steps, ledger actions.
   components/
-    IntroCard.tsx          The welcome card.
-    StoryCard.tsx           One executed stage: actor, description, money-flow diagram, audit lines.
+    IntroCard.tsx          The welcome card (per-tab copy via props).
+    StoryCard.tsx           One executed stage: actor, description, money-flow diagram, audit lines
+                             — takes a structural result type so either engine's output renders.
     FlowDiagram.tsx          The animated money-flow lanes for one stage.
     Controls.tsx             Back / Play / Next + progress dots.
-    ActivityFeed.tsx         The running "journey so far" list.
+    ActivityFeed.tsx         The running "journey so far" list — takes its steps/results as props.
     CompletionCard.tsx       End-of-shipment-story and end-of-company-story cards (with the period recap).
-    DatabasePeek.tsx         The collapsed, optional "see the real tables" panel.
+    DatabasePeek.tsx         Flat design only: the collapsed "see the real tables" panel.
+    LedgerPeek.tsx           Ledger design only: live trial balance + the FinanceTransactions/Entries journal.
 docker/nginx.conf     Serves the built frontend and proxies /api to the backend container.
 ```

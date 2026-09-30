@@ -3,6 +3,7 @@ import express, { type Request, type Response } from 'express';
 import {
   ACTION_DEFINITIONS,
   FinanceEngine,
+  Ledger,
   SCENARIOS,
   TABLE_SCHEMAS,
   type ActionId,
@@ -14,6 +15,7 @@ app.use(cors());
 app.use(express.json());
 
 const engine = new FinanceEngine();
+const ledgerEngine = new Ledger.LedgerEngine();
 
 /**
  * Server-side history of every executed action/scenario, in addition to the
@@ -23,6 +25,10 @@ const engine = new FinanceEngine();
  * before-after state) has something to look up by transactionId.
  */
 let history: ActionOutcome[] = [];
+
+/** Same idea as `history` above, but for the ledger design's own engine
+ * instance (`/api/ledger/*`) — the two designs never share state. */
+let ledgerHistory: Ledger.LedgerActionOutcome[] = [];
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
 
@@ -101,6 +107,54 @@ app.post('/api/reset', (_req: Request, res: Response) => {
   engine.reset();
   history = [];
   res.json({ state: engine.getState(), rollup: engine.getPeriodRollup() });
+});
+
+// ---------------------------------------------------------------------
+// The "second approach" — the double-entry ledger design's own engine,
+// mirroring the routes above one-for-one. See shared/src/ledger for the
+// engine and CLAUDE.md / README.md for what's different and why.
+// ---------------------------------------------------------------------
+
+app.get('/api/ledger/state', (_req: Request, res: Response) => {
+  res.json(ledgerEngine.getState());
+});
+
+app.get('/api/ledger/audit-log', (_req: Request, res: Response) => {
+  res.json(ledgerEngine.getAuditLog());
+});
+
+app.get('/api/ledger/events', (_req: Request, res: Response) => {
+  res.json(ledgerEngine.getEvents());
+});
+
+app.get('/api/ledger/rollup', (_req: Request, res: Response) => {
+  res.json(ledgerEngine.getPeriodRollup());
+});
+
+app.get('/api/ledger/trial-balance', (_req: Request, res: Response) => {
+  res.json(Ledger.getTrialBalance(ledgerEngine.getState()));
+});
+
+app.get('/api/ledger/history', (_req: Request, res: Response) => {
+  res.json(ledgerHistory);
+});
+
+app.post('/api/ledger/actions/:actionId/execute', (req: Request, res: Response) => {
+  const actionId = req.params.actionId as Ledger.LedgerActionId;
+  if (!Ledger.LEDGER_ACTION_IDS.includes(actionId)) {
+    res.status(404).json({ error: `Unknown ledger action: ${actionId}` });
+    return;
+  }
+  const input = (req.body?.input ?? {}) as Record<string, unknown>;
+  const result = ledgerEngine.execute(actionId, input);
+  ledgerHistory.push(result);
+  res.json({ result, state: ledgerEngine.getState(), rollup: ledgerEngine.getPeriodRollup(), trialBalance: Ledger.getTrialBalance(ledgerEngine.getState()) });
+});
+
+app.post('/api/ledger/reset', (_req: Request, res: Response) => {
+  ledgerEngine.reset();
+  ledgerHistory = [];
+  res.json({ state: ledgerEngine.getState(), rollup: ledgerEngine.getPeriodRollup(), trialBalance: Ledger.getTrialBalance(ledgerEngine.getState()) });
 });
 
 app.listen(PORT, () => {
