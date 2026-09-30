@@ -423,6 +423,15 @@ company story records a one-off sale the document's own worked example doesn't c
 - **A failed payout touches nothing.** `executePayout` with `simulateFailure: true`
   posts zero ledger entries — only a `Payout` row — because no money actually moved; the
   retry is what posts `SELLER_PAYOUT`.
+- **The hub safe actually funds the bank.** A `depositToBank` stage (doc §20,
+  `HUB_BANK_DEPOSIT`) sweeps Hub 7's whole safe into `bank:main` right after the
+  reconciliation and before any settlement or payout — so a payout is discharging money
+  the bank actually received, not an unfunded credit.
+
+The tab's own peek panel (`LedgerPeek.tsx`) shows the **real database tables** —
+Finance Accounts, Finance Transactions, Finance Entries, Courier Reconciliations (+
+Lines), Cash Deposits, Settlements (+ Lines), Payouts — the same raw-rows-with-curated-
+columns style as the flat design's Database Peek, not a derived summary.
 
 ## Extending this project
 
@@ -522,6 +531,7 @@ frontend/src/
     ActivityFeed.tsx         The running "journey so far" list — takes its steps/results as props.
     CompletionCard.tsx       End-of-shipment-story and end-of-company-story cards (with the period recap).
     DatabasePeek.tsx         Flat design only: the collapsed "see the real tables" panel.
-    LedgerPeek.tsx           Ledger design only: live trial balance + the FinanceTransactions/Entries journal.
+    LedgerPeek.tsx           Ledger design only: the real raw tables (accounts, transactions,
+                             entries, reconciliations, deposits, settlements, payouts).
 docker/nginx.conf     Serves the built frontend and proxies /api to the backend container.
 ```

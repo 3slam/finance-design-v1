@@ -51,6 +51,13 @@ export const LEDGER_SHIPMENT_STORY: LedgerStoryStep[] = [
     input: () => ({ courierId: 'COU-AHMED', actualCash: 1600 }),
   },
   {
+    id: 'deposit',
+    title: 'The safe deposits to the bank',
+    blurb: 'At the end of the day, Hub 7 deposits everything in its safe into the company bank account (doc §20) — without this step, later payouts would draw on money the bank never actually received.',
+    actionId: 'depositToBank',
+    input: () => ({ hubId: 'HUB-7' }),
+  },
+  {
     id: 'seller-settlement',
     title: 'Finance works out what Seller A is owed',
     blurb: 'No money moves yet — a Settlement just collects every not-yet-claimed transaction touching Seller A’s payable account and freezes the total (doc §21). A different person (Maker-Checker) approves it.',

@@ -59,11 +59,13 @@ backend/          Thin Express REST API around one FinanceEngine instance AND on
                   histories, never shared state.
 frontend/         React + Vite, one app with a two-tab shell (App.tsx): FlatDesignView
                   (the original guided story + DatabasePeek) and LedgerDesignView (the
-                  ledger story + LedgerPeek — chart of accounts, live trial balance, and
-                  the journal of FinanceTransactions/Entries). StoryCard / Controls /
-                  ActivityFeed / CompletionCard are shared by both tabs — StoryCard and
-                  ActivityFeed take structural prop types (not the flat design's concrete
-                  ActionExecutionResult) specifically so both engines' result shapes fit.
+                  ledger story + LedgerPeek — the real raw tables: Finance Accounts,
+                  Finance Transactions, Finance Entries, Courier Reconciliations (+
+                  Lines), Cash Deposits, Settlements (+ Lines), Payouts). StoryCard /
+                  Controls / ActivityFeed / CompletionCard are shared by both tabs —
+                  StoryCard and ActivityFeed take structural prop types (not the flat
+                  design's concrete ActionExecutionResult) specifically so both engines'
+                  result shapes fit.
 docker/           nginx config serving the built frontend and proxying /api to the backend.
 ```
 

@@ -116,6 +116,22 @@ describe('LedgerEngine — doc Part 3 worked example (TX001-TX008)', () => {
     expect(getAccountBalance(state, 'cash:suspense')).toBe(100);
   });
 
+  it('TX005 HUB_BANK_DEPOSIT sweeps the whole safe to the bank (§20)', () => {
+    engine.execute('deliverShipment', { shipmentId: 'PN001' });
+    engine.execute('deliverShipment', { shipmentId: 'PN002' });
+    engine.execute('processReplacement', { shipmentId: 'PN003', subOutcome: 'ReplacementCleanSwap' });
+    engine.execute('startCourierReconciliation', { courierId: 'COU-AHMED', actualCash: 1600 });
+    const result = engine.execute('depositToBank', { hubId: 'HUB-7' });
+    expect(isLedgerActionSuccess(result)).toBe(true);
+    const state = engine.getState();
+    expect(getAccountBalance(state, HUB7_CASH)).toBe(0);
+    expect(getAccountBalance(state, BANK_MAIN)).toBe(1600);
+    const deposit = Object.values(state.cashDeposits)[0];
+    expect(deposit.amount).toBe(1600);
+    expect(deposit.status).toBe('Confirmed');
+    expect(deposit.financeTransactionId).not.toBeNull();
+  });
+
   it('Seller Settlement nets exactly 1,430 EGP (§21) and Courier Settlement nets 125 EGP (§22)', () => {
     engine.execute('deliverShipment', { shipmentId: 'PN001' });
     engine.execute('deliverShipment', { shipmentId: 'PN002' });
@@ -169,6 +185,7 @@ describe('LedgerEngine — doc Part 3 worked example (TX001-TX008)', () => {
       ['deliverShipment', { shipmentId: 'PN002' }],
       ['processReplacement', { shipmentId: 'PN003', subOutcome: 'ReplacementCleanSwap' }],
       ['startCourierReconciliation', { courierId: 'COU-AHMED', actualCash: 1600 }],
+      ['depositToBank', { hubId: 'HUB-7' }],
       ['calculateSellerSettlement', { merchantId: 'MER-A' }],
       ['calculateCourierSettlement', { courierId: 'COU-AHMED' }],
     ];
@@ -205,5 +222,10 @@ describe('LedgerEngine — doc Part 3 worked example (TX001-TX008)', () => {
 
     const rollup = engine.getPeriodRollup();
     expect(rollup.netResult).toBe(-33555); // matches the flat design's own worked-example result exactly
+
+    // The deposit actually funded the bank before anything was paid out of
+    // it, so this is real cash flow, not an unfunded credit (doc §20, §25).
+    expect(getAccountBalance(finalState, BANK_MAIN)).toBe(-33255);
+    expect(getAccountBalance(finalState, HUB7_CASH)).toBe(0);
   });
 });

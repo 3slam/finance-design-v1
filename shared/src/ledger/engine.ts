@@ -55,6 +55,7 @@ export type LedgerActionId =
   | 'deliverShipment'
   | 'processReplacement'
   | 'startCourierReconciliation'
+  | 'depositToBank'
   | 'calculateSellerSettlement'
   | 'calculateCourierSettlement'
   | 'executePayout'
@@ -66,6 +67,7 @@ export const LEDGER_ACTION_IDS: readonly LedgerActionId[] = [
   'deliverShipment',
   'processReplacement',
   'startCourierReconciliation',
+  'depositToBank',
   'calculateSellerSettlement',
   'calculateCourierSettlement',
   'executePayout',
@@ -78,6 +80,7 @@ const ACTION_LABELS: Record<LedgerActionId, string> = {
   deliverShipment: 'Deliver Shipment',
   processReplacement: 'Process Replacement',
   startCourierReconciliation: 'Start Courier Reconciliation',
+  depositToBank: 'Deposit Hub Cash to Bank',
   calculateSellerSettlement: 'Calculate Seller Settlement',
   calculateCourierSettlement: 'Calculate Courier Settlement',
   executePayout: 'Execute Payout',
@@ -349,6 +352,9 @@ export class LedgerEngine {
         case 'startCourierReconciliation':
           this.doStartCourierReconciliation(input as { courierId: ID; actualCash: number });
           break;
+        case 'depositToBank':
+          this.doDepositToBank(input as { hubId: ID });
+          break;
         case 'calculateSellerSettlement':
           this.doCalculateSellerSettlement(input as { merchantId: ID });
           break;
@@ -584,6 +590,51 @@ export class LedgerEngine {
     });
 
     this.moneyFlow('CashHandover', input.actualCash, { type: 'Courier', id: courier.id, label: courier.name }, { type: 'CompanyAccount', id: courier.hubId, label: 'Hub Cash Office' });
+  }
+
+  // ---------------------------------------------------------------------
+  // Cash Deposits (doc §9, §20) — the hub safe sweeps to the bank. Without
+  // this step, settlements/payouts would credit bank:main with money that
+  // was never actually deposited into it.
+  // ---------------------------------------------------------------------
+
+  private doDepositToBank(input: { hubId: ID }): void {
+    const hub = this.state.hubs[input.hubId];
+    if (!hub) throw new ValidationError(`Hub ${input.hubId} does not exist.`, {});
+    this.tx!.actorName = 'Mohamed (Hub Employee)';
+
+    const hubCashAccount = hubCashAccountCode(hub.id);
+    const amount = getAccountBalance(this.state, hubCashAccount);
+    if (!(amount > 0)) throw new ValidationError(`${hub.name}'s safe has no cash to deposit.`, {});
+
+    let deposit!: CashDeposit;
+    this.step('FinanceOperator', 'Deposit to bank', `Mohamed deposits everything in ${hub.name}'s safe — ${amount} EGP — into the company bank account (doc §20).`, () => {
+      deposit = this.insert<CashDeposit>('cash_deposits', {
+        id: this.ids.next('DEP'),
+        hubId: hub.id,
+        amount,
+        bankAccountCode: BANK_MAIN,
+        bankReference: `BANK-${this.ids.next('REF')}`,
+        depositedBy: 'Mohamed (Hub Employee)',
+        status: 'Confirmed',
+        financeTransactionId: null,
+        depositedAt: this.clock(),
+        confirmedAt: this.clock(),
+      });
+      const transaction = this.post(
+        'HUB_BANK_DEPOSIT',
+        `EVT-deposit-${deposit.id}`,
+        `Deposited ${amount} EGP from ${hub.name}'s safe to the company bank account.`,
+        [
+          { accountId: BANK_MAIN, direction: 'Debit', amount, lineType: 'BANK_DEPOSIT' },
+          { accountId: hubCashAccount, direction: 'Credit', amount, lineType: 'BANK_DEPOSIT' },
+        ],
+        { hubId: hub.id, referenceType: 'CashDeposit', referenceId: deposit.id },
+      );
+      this.update<CashDeposit>('cash_deposits', deposit.id, { financeTransactionId: transaction.id });
+    });
+
+    this.moneyFlow('CashHandover', amount, { type: 'CompanyAccount', id: hub.id, label: `${hub.name} Safe` }, { type: 'CompanyAccount', id: null, label: 'Company Bank' });
   }
 
   // ---------------------------------------------------------------------
